@@ -33,7 +33,7 @@ as the target board.
 #### 2. Prepare Zephyr
 
 Follow [this](https://www.zephyrproject.org/doc/getting_started/getting_started.html) page to get
-the Zephyr source and configure the environment. 
+the Zephyr source and configure the environment.
 
 Follow "Building a Sample Application" and check that you can flash the Arduino 101
 
@@ -41,6 +41,10 @@ Remember to source the zephyr environment.
 
 ```
 source zephyr-env.sh
+
+export ZEPHYR_GCC_VARIANT=zephyr
+
+export ZEPHYR_SDK_INSTALL_DIR=<sdk installation directory>
 ```
 
 #### 3. Build JerryScript for Zephyr
@@ -87,4 +91,3 @@ Test command line in serial terminal.
 ```
 > help
 ```
-

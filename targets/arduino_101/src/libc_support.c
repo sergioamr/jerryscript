@@ -17,6 +17,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 /** Compare two strings. return an integer less than, equal to, or greater than zero
      if the first n character of s1 is found, respectively, to be less than, to match,
