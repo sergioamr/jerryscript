@@ -22,4 +22,4 @@ ZEPHYRINCLUDE += -I$(JERRY_INCLUDE)
 obj-y += main-zephyr.o
 
 obj-y += libc_support.o
-obj-y += jerry-asm.o
+#obj-y += jerry-asm.o
