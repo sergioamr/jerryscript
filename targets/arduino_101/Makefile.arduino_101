@@ -64,14 +64,14 @@ EXT_CFLAGS += -ffunction-sections -fno-inline-functions
 ifeq ($(BOARD),qemu_x86)
 CONFIG_TOOLCHAIN_VARIANT = x86
 EXT_CFLAGS += -march=pentium
+EXT_CFLAGS += -mpreferred-stack-boundary=2 -mno-sse
 else ifeq ($(BOARD),qemu_cortex_m3)
 CONFIG_TOOLCHAIN_VARIANT = arm
 else
 CONFIG_TOOLCHAIN_VARIANT = iamcu
 EXT_CFLAGS += -march=lakemont -mtune=lakemont -miamcu -msoft-float
-endif
-
 EXT_CFLAGS += -mpreferred-stack-boundary=2 -mno-sse
+endif
 
 EXT_CFLAGS += -Wall -Wno-format-zero-length -Wno-pointer-sign
 EXT_CFLAGS += -Werror=format -Werror=implicit-int -Wno-unused-but-set-variable
