@@ -51,6 +51,9 @@ KBUILD_VERBOSE = $(V)
 
 APP = main-zephyr.c
 
+ALL_LIBS += $(USER_LIBS)
+export ALL_LIBS
+
 include ${ZEPHYR_BASE}/Makefile.inc 
 
 .PHONY = showconfig
