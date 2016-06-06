@@ -24,6 +24,8 @@ else
 BOARD ?= arduino_101
 BOARD_NAME ?= arduino_101
 endif
+# To make qemu override above work, export BOARD
+export BOARD
 
 ifeq ($(BOARD),qemu_x86)
 BOARD_NAME ?= qemu_x86
