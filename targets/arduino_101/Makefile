@@ -53,6 +53,8 @@ APP = main-zephyr.c
 
 ALL_LIBS += $(USER_LIBS)
 export ALL_LIBS
+LDFLAGS_zephyr += $(USER_LIB_INCLUDE_DIR)
+export LDFLAGS_zephyr
 
 include ${ZEPHYR_BASE}/Makefile.inc 
 

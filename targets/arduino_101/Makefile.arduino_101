@@ -102,7 +102,7 @@ LIBS = $(TYPE).external$(VARIETY)-entry $(PREFIX).jerry-core $(PREFIX).jerry-lib
 # TODO @sergioamr Change how we link the library to USER_LDFLAGS
 # https://gerrit.zephyrproject.org/r/#/c/2048/
 
-BUILD_CONFIG = O="$(OUTPUT)/zephyr" V=$(V) USER_LIBS="$(LIBS)" LIB_INCLUDE_DIR="$(LIB_INCLUDE_DIR)"
+BUILD_CONFIG = O="$(OUTPUT)/zephyr" V=$(V) USER_LIBS="$(LIBS)" USER_LIB_INCLUDE_DIR="-L $(CURDIR)/$(OUTPUT)"
 
 .PHONY: all
 all: jerry zephyr
