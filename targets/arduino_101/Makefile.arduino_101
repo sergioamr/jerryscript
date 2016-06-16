@@ -68,6 +68,11 @@ else ifeq ($(BOARD),qemu_cortex_m3)
 CONFIG_TOOLCHAIN_VARIANT = arm
 CPU = arm7-m
 EXT_CFLAGS += -march=armv7-m -mthumb -mcpu=cortex-m3 -mabi=aapcs
+else ifeq ($(BOARD),em_starterkit)
+# TODO: Tested only to build, untested to boot
+CONFIG_TOOLCHAIN_VARIANT = arc
+CPU = arc
+EXT_CFLAGS += -mARCv2EM -mav2em -mno-sdata
 else
 CONFIG_TOOLCHAIN_VARIANT = iamcu
 CPU = lakemont
