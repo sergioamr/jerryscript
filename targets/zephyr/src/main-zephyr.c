@@ -21,7 +21,10 @@
 #include <misc/printk.h>
 #include <misc/shell.h>
 
+#include <uart_uploader.h>
 #include "jerry.h"
+
+#define CONFIG_USE_JS_SHELL
 
 #if defined (CONFIG_STDOUT_CONSOLE)
 #include <stdio.h>
@@ -31,7 +34,9 @@
 #define PRINT       printk
 #endif
 
+#ifdef CONFIG_USE_JS_SHELL
 static char *source_buffer = NULL;
+#endif
 static unsigned char flags = 0;
 
 #define VERBOSE 0x01
@@ -92,7 +97,7 @@ static int shell_cmd_test (int argc, char *argv[])
   return jerryscript_test ();
 } /* shell_cmd_test */
 
-
+#ifdef CONFIG_USE_JS_SHELL
 static int shell_cmd_handler (int argc, char *argv[])
 {
   if (argc <= 0)
@@ -142,6 +147,7 @@ static int shell_cmd_handler (int argc, char *argv[])
 
   return 0;
 } /* shell_cmd_handler */
+#endif
 
 #define SHELL_COMMAND(name,cmd) { name, cmd }
 
@@ -154,11 +160,14 @@ const struct shell_cmd commands[] =
   SHELL_COMMAND (NULL, NULL)
 };
 
-
 void main (void)
 {
-  printf ("Jerry Compilation " __DATE__ " " __TIME__ "\n");
+#ifdef CONFIG_USE_JS_SHELL
+  printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
   shell_register_app_cmd_handler (shell_cmd_handler);
   shell_init ("js> ", commands);
+#else
+  printf("Jerry Uploader " __DATE__ " " __TIME__ "\n");
+  uart_uploader_init();
+#endif
 } /* main */
-

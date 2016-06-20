@@ -20,3 +20,4 @@ endif
 ZEPHYRINCLUDE += -I$(JERRY_INCLUDE)
 
 obj-y += main-zephyr.o
+obj-y += uart_uploader.o
