@@ -168,6 +168,12 @@ void uart_uploader_isr(struct device *unused)
 				cur = 0;
 				printf("[ACK]\n");
 				break;
+			case '\n':
+				cmd->line[cur] = '\0';
+				nano_isr_fifo_put(&lines_queue, cmd);
+				cur = 0;
+				cmd = NULL;
+				break;
 			default:
 				break;
 			}
@@ -176,7 +182,6 @@ void uart_uploader_isr(struct device *unused)
 		}
 
 		/* Flush the data into the buffer if end of line or each 32 bytes */
-
 		cmd->line[cur++] = byte;
 
 		if (byte == '\n' || cur > 32) {
@@ -224,7 +229,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 	ihex_bool_t checksum_error) {
 	if (type == IHEX_DATA_RECORD) {
 		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
-		printf("%n::%n\n", address, ihex->length);
+		printf("%d::%d\n", address, ihex->length);
 		//(void)fseek(outfile, address, SEEK_SET);
 		//(void)fwrite(ihex->data, ihex->length, 1, outfile);
 	}
