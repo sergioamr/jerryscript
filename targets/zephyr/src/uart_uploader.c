@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <ctype.h>
 
@@ -42,6 +43,8 @@
 #include <sections.h>
 #include <atomic.h>
 #include <misc/printk.h>
+
+#include "code_memory.h"
 #include "ihex/kk_ihex_read.h"
 
 #define CONFIG_UART_UPLOAD_HANDLER_STACKSIZE 2000
@@ -50,7 +53,13 @@
 
 static char __stack fiberStack[STACKSIZE];
 
-/*********************************** UART CAPTURE ****************************************/
+/*
+ * Contains the pointer to the memory where the code will be uploaded
+ * using the stub interface at code_memory.c
+ */
+static CODE *code_memory = NULL;
+
+/**************************** UART CAPTURE **********************************/
 
 static struct ihex_state ihex;
 
@@ -63,24 +72,22 @@ static struct device *uart_uploader_dev;
 #define ESC                0x1b
 #define DEL                0x7f
 
-#define MAX_LINE_LEN 256
+#define MAX_LINE_LEN 128
 struct uart_uploader_input {
 	int _unused;
 	char line[MAX_LINE_LEN];
 };
 
-#define MAX_LINES_QUEUED 3
+#define MAX_LINES_QUEUED 8
 static struct uart_uploader_input buf[MAX_LINES_QUEUED];
 
 #if defined(CONFIG_PRINTK) || defined(CONFIG_STDOUT_CONSOLE)
 
 void uart_clear(void) {
 	int i;
-
 	for (i = 0; i < MAX_LINES_QUEUED; i++) {
 		nano_fifo_put(&avail_queue, &buf[i]);
 	}
-
 }
 
 /**
@@ -118,12 +125,11 @@ static uint8_t cur;
 
 void uart_uploader_isr(struct device *unused)
 {
-	int flush = 0;
 	ARG_UNUSED(unused);
 
 	while (uart_irq_update(uart_uploader_dev) &&
 		uart_irq_is_pending(uart_uploader_dev)) {
-		static struct uart_uploader_input *cmd;
+		static struct uart_uploader_input *cmd = NULL;
 		uint8_t byte;
 		int rx;
 
@@ -143,14 +149,15 @@ void uart_uploader_isr(struct device *unused)
 			* The input hook indicates that no further processing
 			* should be done by this handler.
 			*/
-			printf("- End\n");
 			return;
 		}
 
 		if (!cmd) {
 			cmd = nano_isr_fifo_get(&avail_queue, TICKS_NONE);
-			if (!cmd)
+			if (!cmd) {
+				//uart_poll_out(uart_uploader_dev, 'c');
 				return;
+			}
 		}
 
 		/* Handle special control characters */
@@ -184,7 +191,7 @@ void uart_uploader_isr(struct device *unused)
 		/* Flush the data into the buffer if end of line or each 32 bytes */
 		cmd->line[cur++] = byte;
 
-		if (byte == '\n' || cur > 32) {
+		if (cur >= MAX_LINE_LEN) {
 			cmd->line[cur] = '\0';
 			nano_isr_fifo_put(&lines_queue, cmd);
 			cur = 0;
@@ -208,19 +215,37 @@ void uploader_input_init(void) {
 	uart_irq_rx_enable(uart_uploader_dev);
 }
 
+int8_t upload_state = 0;
+#define UPLOAD_START       0
+#define UPLOAD_IN_PROGRESS 1
+#define UPLOAD_FINISHED    2
+#define UPLOAD_ERROR       -1
+
 void uart_uploader_runner(int arg1, int arg2)
 {
-	ihex_begin_read(&ihex);
-	printf("[Waiting for data]\n");
-
+	struct uart_uploader_input *cmd;
 	while (1) {
-		struct uart_uploader_input *cmd;
-		cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
-		//printf("[Read][%s]%n \n", cmd->line, strlen(cmd->line));
-		ihex_read_bytes(&ihex, cmd->line, strlen(cmd->line));
-		nano_fiber_fifo_put(&avail_queue, cmd);
+		upload_state = UPLOAD_START;
+		printf("[Waiting for data]\n");
+		ihex_begin_read(&ihex);
+		code_memory = csopen("test.js", "rw+");
+
+		while (upload_state != UPLOAD_FINISHED) {
+			cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
+			printf("[Read][%s]\n", cmd->line);
+			ihex_read_bytes(&ihex, cmd->line, strlen(cmd->line));
+
+			if (upload_state == UPLOAD_ERROR) {
+				printf("[Download Error]\n");
+				break;
+			}
+			nano_fiber_fifo_put(&avail_queue, cmd);
+		}
+
+		if (upload_state == UPLOAD_FINISHED)
+			csclose(code_memory);
+		ihex_end_read(&ihex);
 	}
-	ihex_end_read(&ihex);
 }
 
 /* Data received from the buffer */
@@ -228,14 +253,16 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 	ihex_record_type_t type,
 	ihex_bool_t checksum_error) {
 	if (type == IHEX_DATA_RECORD) {
+		upload_state = UPLOAD_IN_PROGRESS;
 		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
-		printf("%d::%d\n", address, ihex->length);
-		//(void)fseek(outfile, address, SEEK_SET);
-		//(void)fwrite(ihex->data, ihex->length, 1, outfile);
+		ihex->data[ihex->length] = 0;
+		printf("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
+		csseek(code_memory, address, SEEK_SET);
+		cswrite(ihex->data, ihex->length, 1, code_memory);
 	}
 	else if (type == IHEX_END_OF_FILE_RECORD) {
-		//(void)fclose(outfile);
 		printf("[End of file]\n");
+		upload_state = UPLOAD_FINISHED;
 	}
 	return true;
 }
