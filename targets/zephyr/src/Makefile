@@ -21,3 +21,6 @@ ZEPHYRINCLUDE += -I$(JERRY_INCLUDE)
 
 obj-y += main-zephyr.o
 obj-y += uart_uploader.o
+
+obj-y += uart_uploader.o
+obj-y += ihex/kk_ihex_read.o

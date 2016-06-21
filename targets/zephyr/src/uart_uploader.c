@@ -21,7 +21,7 @@
 * Reads a program from the uart using Intel HEX format.
 *
 * Designed to be used from Javascript or a ECMAScript object file.
-* 
+*
 * Hooks into the printk and fputc (for printf) modules. Poll driven.
 */
 
@@ -42,6 +42,7 @@
 #include <sections.h>
 #include <atomic.h>
 #include <misc/printk.h>
+#include "ihex/kk_ihex_read.h"
 
 #define CONFIG_UART_UPLOAD_HANDLER_STACKSIZE 2000
 
@@ -51,8 +52,10 @@ static char __stack fiberStack[STACKSIZE];
 
 /*********************************** UART CAPTURE ****************************************/
 
+static struct ihex_state ihex;
+
 static struct nano_fifo avail_queue;
-static struct nano_fifo cmds_queue;
+static struct nano_fifo lines_queue;
 
 static struct device *uart_uploader_dev;
 
@@ -70,6 +73,15 @@ struct uart_uploader_input {
 static struct uart_uploader_input buf[MAX_LINES_QUEUED];
 
 #if defined(CONFIG_PRINTK) || defined(CONFIG_STDOUT_CONSOLE)
+
+void uart_clear(void) {
+	int i;
+
+	for (i = 0; i < MAX_LINES_QUEUED; i++) {
+		nano_fifo_put(&avail_queue, &buf[i]);
+	}
+
+}
 
 /**
 * Outputs both line feed and carriage return in the case of a '\n'.
@@ -102,8 +114,11 @@ static int read_uart(struct device *uart, uint8_t *buf, unsigned int size)
 	return rx;
 }
 
+static uint8_t cur;
+
 void uart_uploader_isr(struct device *unused)
 {
+	int flush = 0;
 	ARG_UNUSED(unused);
 
 	while (uart_irq_update(uart_uploader_dev) &&
@@ -128,7 +143,7 @@ void uart_uploader_isr(struct device *unused)
 			* The input hook indicates that no further processing
 			* should be done by this handler.
 			*/
-			uart_poll_out(uart_uploader_dev, 'E');
+			printf("- End\n");
 			return;
 		}
 
@@ -142,24 +157,33 @@ void uart_uploader_isr(struct device *unused)
 		if (!isprint(byte)) {
 			switch (byte) {
 			case DEL:
-				printf("- Delete \n");
+				cmd->line[cur] = '\0';
+				printf("[%s]%d\n", cmd->line, cur);
 				break;
 			case ESC:
-				printf("- Esc_state \n");				
+				printf("[Clear]\n");
+				uart_clear();
 				break;
 			case '\r':
-				printf("- Return \n");
-				uart_poll_out(uart_uploader_dev, '*');
-				uart_poll_out(uart_uploader_dev, '\r');
-				uart_poll_out(uart_uploader_dev, '\n');
-				nano_isr_fifo_put(&cmds_queue, cmd);
-				cmd = NULL;
+				cur = 0;
+				printf("[ACK]\n");
 				break;
 			default:
 				break;
 			}
 
 			continue;
+		}
+
+		/* Flush the data into the buffer if end of line or each 32 bytes */
+
+		cmd->line[cur++] = byte;
+
+		if (byte == '\n' || cur > 32) {
+			cmd->line[cur] = '\0';
+			nano_isr_fifo_put(&lines_queue, cmd);
+			cur = 0;
+			cmd = NULL;
 		}
 	}
 }
@@ -181,32 +205,47 @@ void uploader_input_init(void) {
 
 void uart_uploader_runner(int arg1, int arg2)
 {
+	ihex_begin_read(&ihex);
+	printf("[Waiting for data]\n");
+
 	while (1) {
 		struct uart_uploader_input *cmd;
-		printf("[Waiting for data]");
-
-		cmd = nano_fiber_fifo_get(&cmds_queue, TICKS_UNLIMITED);
-		printf("[Got data]\n");
-		printf("[%s]\n", cmd->line);
-
+		cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
+		//printf("[Read][%s]%n \n", cmd->line, strlen(cmd->line));
+		ihex_read_bytes(&ihex, cmd->line, strlen(cmd->line));
+		nano_fiber_fifo_put(&avail_queue, cmd);
 	}
+	ihex_end_read(&ihex);
+}
+
+/* Data received from the buffer */
+ihex_bool_t ihex_data_read(struct ihex_state *ihex,
+	ihex_record_type_t type,
+	ihex_bool_t checksum_error) {
+	if (type == IHEX_DATA_RECORD) {
+		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
+		printf("%n::%n\n", address, ihex->length);
+		//(void)fseek(outfile, address, SEEK_SET);
+		//(void)fwrite(ihex->data, ihex->length, 1, outfile);
+	}
+	else if (type == IHEX_END_OF_FILE_RECORD) {
+		//(void)fclose(outfile);
+		printf("[End of file]\n");
+	}
+	return true;
 }
 
 /* Setup code uploader */
 void uart_uploader_init(void) {
-	nano_fifo_init(&cmds_queue);
-	nano_fifo_init(&avail_queue);
 
-	int i;
-	for (i = 0; i < MAX_LINES_QUEUED; i++) {
-		nano_fifo_put(&avail_queue, &buf[i]);
-	}
+	nano_fifo_init(&lines_queue);
+	nano_fifo_init(&avail_queue);
+	uart_clear();
 
 	task_fiber_start(fiberStack, STACKSIZE, uart_uploader_runner, 0, 0, 7, 0);
 
-	printf(" Uart handler register \n");
 	/* Register uart handler */
-	uploader_input_init();	
+	uploader_input_init();
 
 } /* uart_uploader_init */
 
@@ -219,7 +258,7 @@ void uart_uploader_init(void) {
 static int uart_serial_uploader_init(struct device *arg)
 {
 	ARG_UNUSED(arg);
-	uart_uploader_dev = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);	
+	uart_uploader_dev = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
 
 	/* Install printk / stdout hook for UART uploader output */
 	__stdout_hook_install(uploader_out);

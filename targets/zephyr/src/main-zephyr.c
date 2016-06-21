@@ -24,7 +24,7 @@
 #include <uart_uploader.h>
 #include "jerry.h"
 
-#define CONFIG_USE_JS_SHELL
+//#define CONFIG_USE_JS_SHELL
 
 #if defined (CONFIG_STDOUT_CONSOLE)
 #include <stdio.h>
