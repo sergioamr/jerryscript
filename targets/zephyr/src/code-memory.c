@@ -32,14 +32,7 @@
 #include <device.h>
 #include <init.h>
 
-#include <board.h>
-#include <uart.h>
-#include <toolchain.h>
-#include <sections.h>
-#include <atomic.h>
-#include <misc/printk.h>
-
-#include "code_memory.h"
+#include "code-memory.h"
 #include "ihex/kk_ihex_read.h"
 
 static struct code_memory memory_code;
@@ -105,7 +98,6 @@ int csclose(CODE * stream) {
 
 #ifdef TESTING
 void main() {
-
 	CODE *myfile;
 
 	myfile = csopen("test.js", "rw+");
@@ -113,8 +105,16 @@ void main() {
 
 	cswrite("01234567890123456789\0", 21, sizeof(char), myfile);
 	printf("[%s] %i \n", myfile->data, myfile->curoff);
+
 	csseek(myfile, 10, SEEK_SET);
 	cswrite("ABCDEFGHIK\0", 11, sizeof(char), myfile);
+	printf("[%s] %i \n", myfile->data, myfile->curoff);
+
+	csseek(myfile, 5, SEEK_SET);
+	cswrite("01234", 5, sizeof(char), myfile);
+	printf("[%s] %i \n", myfile->data, myfile->curoff);
+
+	cswrite("01234\0", 6, sizeof(char), myfile);
 	printf("[%s] %i \n", myfile->data, myfile->curoff);
 
 	csseek(myfile, -10, SEEK_END);

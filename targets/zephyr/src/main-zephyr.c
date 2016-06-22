@@ -21,7 +21,7 @@
 #include <misc/printk.h>
 #include <misc/shell.h>
 
-#include <uart_uploader.h>
+#include <uart-uploader.h>
 #include "jerry.h"
 
 //#define CONFIG_USE_JS_SHELL

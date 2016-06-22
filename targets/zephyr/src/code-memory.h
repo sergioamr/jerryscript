@@ -20,9 +20,10 @@
 
 struct code_memory {
 	char data[MAX_JAVASCRIPT_CODE_LEN];
-	size_t curoff;
-	size_t curend;
-	size_t maxsize;
+	uint8_t type;
+	uint16_t curoff;
+	uint16_t curend;
+	uint16_t maxsize;
 };
 
 #define CODE struct code_memory

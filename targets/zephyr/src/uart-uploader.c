@@ -44,7 +44,9 @@
 #include <atomic.h>
 #include <misc/printk.h>
 
-#include "code_memory.h"
+#include "code-memory.h"
+#include "jerry-code.h"
+
 #include "ihex/kk_ihex_read.h"
 
 #define CONFIG_UART_UPLOAD_HANDLER_STACKSIZE 2000
@@ -223,12 +225,14 @@ int8_t upload_state = 0;
 
 void uart_uploader_runner(int arg1, int arg2)
 {
+	const char *code_name = "test.js";
+
 	struct uart_uploader_input *cmd;
 	while (1) {
 		upload_state = UPLOAD_START;
 		printf("[Waiting for data]\n");
 		ihex_begin_read(&ihex);
-		code_memory = csopen("test.js", "rw+");
+		code_memory = csopen(code_name, "rw+");
 
 		while (upload_state != UPLOAD_FINISHED) {
 			cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
@@ -244,7 +248,10 @@ void uart_uploader_runner(int arg1, int arg2)
 
 		if (upload_state == UPLOAD_FINISHED)
 			csclose(code_memory);
+
 		ihex_end_read(&ihex);
+
+		javascript_run_code(code_name);
 	}
 }
 
