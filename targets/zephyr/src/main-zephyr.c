@@ -162,6 +162,8 @@ const struct shell_cmd commands[] =
 
 void main (void)
 {
+  jerry_init(JERRY_FLAG_EMPTY);
+
 #ifdef CONFIG_USE_JS_SHELL
   printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
   shell_register_app_cmd_handler (shell_cmd_handler);

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, 2014-2015 Wind River Systems, Inc.
+* Copyright (c) Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -21,8 +21,39 @@
 * Reads a program from the ROM/RAM
 */
 
-void javascript_run_code(const char *file_name) {
+// Zephyr includes
+#include <zephyr.h>
 
+#include <string.h>
+
+// JerryScript includes
+#include "jerry.h"
+#include "jerry-api.h"
+
+#include "code-memory.h"
+
+void javascript_run_code(const char *file_name) {
+	jerry_object_t *err_obj_p = NULL;
+	jerry_value_t res;
+
+	CODE *code = csopen(file_name, "r");
+
+	if (code == NULL)
+		return;
+
+	size_t len = strlen((char *) code);
+
+	if (!jerry_parse((jerry_char_t *) code, len, &err_obj_p)) {
+		printf("JerryScript: cannot parse javascript\n");
+		return;
+	}
+
+	if (jerry_run(&res) != JERRY_COMPLETION_CODE_OK) {
+		printf("JerryScript: cannot run javascript\n");
+		return;
+	}
+
+	csclose(code);
 }
 
 void javascript_run_snapshot(const char *file_name) {

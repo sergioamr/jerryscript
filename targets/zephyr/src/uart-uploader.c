@@ -232,11 +232,14 @@ void uart_uploader_runner(int arg1, int arg2)
 		upload_state = UPLOAD_START;
 		printf("[Waiting for data]\n");
 		ihex_begin_read(&ihex);
-		code_memory = csopen(code_name, "rw+");
+		code_memory = csopen(code_name, "w+");
 
 		while (upload_state != UPLOAD_FINISHED) {
 			cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
+
+#ifdef DEBUG_UART
 			printf("[Read][%s]\n", cmd->line);
+#endif
 			ihex_read_bytes(&ihex, cmd->line, strlen(cmd->line));
 
 			if (upload_state == UPLOAD_ERROR) {
@@ -263,7 +266,9 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		upload_state = UPLOAD_IN_PROGRESS;
 		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
 		ihex->data[ihex->length] = 0;
+#ifdef DEBUG_UART
 		printf("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
+#endif
 		csseek(code_memory, address, SEEK_SET);
 		cswrite(ihex->data, ihex->length, 1, code_memory);
 	}
