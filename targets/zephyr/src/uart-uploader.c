@@ -223,6 +223,13 @@ int8_t upload_state = 0;
 #define UPLOAD_FINISHED    2
 #define UPLOAD_ERROR       -1
 
+/*
+ * Negotiate a re-upload
+ */
+void uart_handle_upload_error() {
+	printf("[Download Error]\n");
+}
+
 void uart_uploader_runner(int arg1, int arg2)
 {
 	const char *code_name = "test.js";
@@ -243,18 +250,19 @@ void uart_uploader_runner(int arg1, int arg2)
 			ihex_read_bytes(&ihex, cmd->line, strlen(cmd->line));
 
 			if (upload_state == UPLOAD_ERROR) {
-				printf("[Download Error]\n");
+				uart_handle_upload_error();
 				break;
 			}
+
 			nano_fiber_fifo_put(&avail_queue, cmd);
 		}
 
-		if (upload_state == UPLOAD_FINISHED)
+		if (upload_state == UPLOAD_FINISHED) {
 			csclose(code_memory);
+			ihex_end_read(&ihex);
+			javascript_run_code(code_name);
+		}
 
-		ihex_end_read(&ihex);
-
-		javascript_run_code(code_name);
 	}
 }
 
@@ -262,9 +270,15 @@ void uart_uploader_runner(int arg1, int arg2)
 ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 	ihex_record_type_t type,
 	ihex_bool_t checksum_error) {
+
+	if (checksum_error) {
+		upload_state = UPLOAD_ERROR;
+		return false;
+	};
+
 	if (type == IHEX_DATA_RECORD) {
 		upload_state = UPLOAD_IN_PROGRESS;
-		unsigned long address = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
+		unsigned long address = (unsigned long) IHEX_LINEAR_ADDRESS(ihex);
 		ihex->data[ihex->length] = 0;
 #ifdef DEBUG_UART
 		printf("%d::%d:: %s \n", (int)address, ihex->length, ihex->data);
@@ -273,7 +287,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 		cswrite(ihex->data, ihex->length, 1, code_memory);
 	}
 	else if (type == IHEX_END_OF_FILE_RECORD) {
-		printf("[End of file]\n");
+		printf("[EOF]\n");
 		upload_state = UPLOAD_FINISHED;
 	}
 	return true;
