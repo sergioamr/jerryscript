@@ -55,6 +55,8 @@
 
 static char __stack fiberStack[STACKSIZE];
 
+#define DEBUG_UART
+
 /*
  * Contains the pointer to the memory where the code will be uploaded
  * using the stub interface at code_memory.c
@@ -170,7 +172,8 @@ void uart_uploader_isr(struct device *unused)
 				printf("[%s]%d\n", cmd->line, cur);
 				break;
 			case ESC:
-				printf("[Clear]\n");
+				// Clear
+				printf("[CLR]\n");
 				uart_clear();
 				break;
 			case '\r':
