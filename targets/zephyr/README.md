@@ -28,6 +28,12 @@ harmony
 Following Zephyr boards were tested: qemu_x86, qemu_cortex_m3, arduino_101,
 frdm_k64f.
 
+3. Get libraries to encode into Intel HEX
+
+```
+cd targets/zephyr
+./scripts/get-dependencies.sh
+```
 
 #### 2. Prepare Zephyr
 

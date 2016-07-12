@@ -157,6 +157,9 @@ dfu-x86: all
 	if [ $$? -eq 0 ] ; then echo "\nYour program will launch in 5 seconds." ; \
 	else echo "\nProgram didn't flash, try pressing the reset buttons \nand wait a second for the bootloader to load, \nor flash again the factory bootloader."; fi
 
+debugserver:
+	make -f $(TARGET_ZEPHYR)/Makefile BOARD=arduino_101 debugserver
+
 usage:
 help:
 	@echo Usage:
@@ -166,6 +169,7 @@ help:
 
 showconfig:
 	@echo "- CONFIGURATION ------------------------------------------------"
+	@echo "BOARD            = $(BOARD)"
 	@echo "INTERM           = $(INTERM)"
 	@echo "OUTPUT           = $(OUTPUT)"
 	@echo "CC               = $(CC) "

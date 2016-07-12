@@ -23,6 +23,10 @@
 
 #include "jerry-api.h"
 
+#include "uart-uploader.h"
+
+//#define CONFIG_USE_JS_SHELL
+
 #if defined (CONFIG_STDOUT_CONSOLE)
 #include <stdio.h>
 #define PRINT       printf
@@ -30,11 +34,6 @@
 #include <misc/printk.h>
 #define PRINT       printk
 #endif
-
-static char *source_buffer = NULL;
-static unsigned char flags = 0;
-
-#define VERBOSE 0x01
 
 /**
  * Jerryscript simple test loop
@@ -56,6 +55,11 @@ int jerryscript_test ()
   return jerry_value_has_error_flag (ret_val) ? -1 : 0;
 } /* jerryscript_test */
 
+#ifdef CONFIG_USE_JS_SHELL
+#define VERBOSE 0x01
+
+static char *source_buffer = NULL;
+static unsigned char flags = 0;
 
 static int shell_cmd_verbose (int argc, char *argv[])
 {
@@ -89,7 +93,6 @@ static int shell_cmd_test (int argc, char *argv[])
 {
   return jerryscript_test ();
 } /* shell_cmd_test */
-
 
 static int shell_cmd_handler (int argc, char *argv[])
 {
@@ -153,17 +156,22 @@ const struct shell_cmd commands[] =
   SHELL_COMMAND ("verbose", shell_cmd_verbose),
   SHELL_COMMAND (NULL, NULL)
 };
-
+#endif
 
 void main (void)
 {
-  printf ("Jerry Compilation " __DATE__ " " __TIME__ "\n");
+#ifdef CONFIG_USE_JS_SHELL
   jerry_init (JERRY_INIT_EMPTY);
+  printf("Jerry Shell " __DATE__ " " __TIME__ "\n");
   shell_register_app_cmd_handler (shell_cmd_handler);
   shell_init ("js> ", commands);
   /* Don't call jerry_cleanup() here, as shell_init() returns after setting
      up background task to process shell input, and that task calls
      shell_cmd_handler(), etc. as callbacks. This processing happens in
      the infinite loop, so JerryScript doesn't need to be de-initialized. */
+#else
+  printf("Jerry Uploader " __DATE__ " " __TIME__ "\n");
+  uart_uploader_init();
+#endif
 } /* main */
 
