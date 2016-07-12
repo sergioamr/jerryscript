@@ -45,7 +45,7 @@ cd ../..
 sudo ln -s /usr/include/asm-generic /usr/include/asm
 
 # build jerryscript for qemu
-make -f ./targets/arduino_101/Makefile.arduino_101 BOARD=qemu_x86
+make -f ./targets/zephyr/Makefile.zephyr BOARD=qemu_x86
 
 # create 2 named pipes to input jerryscript commands and evaluate the output
 mkfifo path.in path.out
