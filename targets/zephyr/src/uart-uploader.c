@@ -82,7 +82,7 @@ struct uart_uploader_input {
 	char line[MAX_LINE_LEN];
 };
 
-#define MAX_LINES_QUEUED 8
+#define MAX_LINES_QUEUED 4
 static struct uart_uploader_input buf[MAX_LINES_QUEUED];
 
 #if defined(CONFIG_PRINTK) || defined(CONFIG_STDOUT_CONSOLE)
@@ -117,9 +117,11 @@ static int read_uart(struct device *uart, uint8_t *buf, unsigned int size)
 {
 	int rx;
 	rx = uart_fifo_read(uart, buf, size);
+
 	if (rx < 0) {
+		printf("[STOP]\n");
 		/* Overrun issue. Stop the UART */
-		uart_irq_rx_disable(uart);
+		//uart_irq_rx_disable(uart);
 		return -EIO;
 	}
 	return rx;
@@ -130,6 +132,8 @@ static uint8_t cur;
 void uart_uploader_isr(struct device *unused)
 {
 	ARG_UNUSED(unused);
+	unsigned char buffer[32];
+	uint8_t pos;
 
 	while (uart_irq_update(uart_uploader_dev) &&
 		uart_irq_is_pending(uart_uploader_dev)) {
@@ -141,66 +145,70 @@ void uart_uploader_isr(struct device *unused)
 			continue;
 		}
 
+		pos = 0;
 		/* Character(s) have been received */
-
-		rx = read_uart(uart_uploader_dev, &byte, 1);
+		rx = read_uart(uart_uploader_dev, buffer, 32);
 		if (rx < 0) {
 			return;
 		}
 
-		if (uart_irq_input_hook(uart_uploader_dev, byte) != 0) {
-			/*
-			* The input hook indicates that no further processing
-			* should be done by this handler.
-			*/
-			return;
-		}
-
-		if (!cmd) {
-			cmd = nano_isr_fifo_get(&avail_queue, TICKS_NONE);
-			if (!cmd) {
-				//uart_poll_out(uart_uploader_dev, 'c');
+		while (rx > 0) {
+			byte = buffer[pos++];
+			if (uart_irq_input_hook(uart_uploader_dev, byte) != 0) {
+				/*
+				* The input hook indicates that no further processing
+				* should be done by this handler.
+				*/
 				return;
 			}
-		}
 
-		/* Handle special control characters */
-		if (!isprint(byte)) {
-			switch (byte) {
-			case DEL:
-				cmd->line[cur] = '\0';
-				printf("[%s]%d\n", cmd->line, cur);
-				break;
-			case ESC:
-				// Clear
-				printf("[CLR]\n");
-				uart_clear();
-				break;
-			case '\r':
-				cur = 0;
-				printf("[ACK]\n");
-				break;
-			case '\n':
+			if (!cmd) {
+				cmd = nano_isr_fifo_get(&avail_queue, TICKS_NONE);
+				if (!cmd) {
+					//uart_poll_out(uart_uploader_dev, 'c');
+					return;
+				}
+			}
+
+			/* Handle special control characters */
+			if (!isprint(byte)) {
+				switch (byte) {
+				case DEL:
+					cmd->line[cur] = '\0';
+					printf("[%s]%d\n", cmd->line, cur);
+					break;
+				case ESC:
+					// Clear
+					printf("[CLR]\n");
+					uart_clear();
+					break;
+				case '\r':
+					cur = 0;
+					printf("[ACK]\n");
+					break;
+				case '\n':
+					cmd->line[cur] = '\0';
+					nano_isr_fifo_put(&lines_queue, cmd);
+					cur = 0;
+					cmd = NULL;
+					break;
+				default:
+					break;
+				}
+
+				continue;
+			}
+
+			if (cur >= MAX_LINE_LEN) {
 				cmd->line[cur] = '\0';
 				nano_isr_fifo_put(&lines_queue, cmd);
 				cur = 0;
 				cmd = NULL;
-				break;
-			default:
-				break;
 			}
 
-			continue;
-		}
+			cmd->line[cur++] = byte;
 
-		/* Flush the data into the buffer if end of line or each 32 bytes */
-		cmd->line[cur++] = byte;
-
-		if (cur >= MAX_LINE_LEN) {
-			cmd->line[cur] = '\0';
-			nano_isr_fifo_put(&lines_queue, cmd);
-			cur = 0;
-			cmd = NULL;
+			rx--;
 		}
 	}
 }
@@ -246,7 +254,6 @@ void uart_uploader_runner(int arg1, int arg2)
 
 		while (upload_state != UPLOAD_FINISHED) {
 			cmd = nano_fiber_fifo_get(&lines_queue, TICKS_UNLIMITED);
-
 #ifdef DEBUG_UART
 			printf("[Read][%s]\n", cmd->line);
 #endif
@@ -260,6 +267,8 @@ void uart_uploader_runner(int arg1, int arg2)
 			nano_fiber_fifo_put(&avail_queue, cmd);
 		}
 
+		printf("1\n");
+
 		if (upload_state == UPLOAD_FINISHED) {
 			csclose(code_memory);
 			ihex_end_read(&ihex);
@@ -267,6 +276,8 @@ void uart_uploader_runner(int arg1, int arg2)
 		}
 
 	}
+
+	printf("[NP]\n");
 }
 
 /* Data received from the buffer */
